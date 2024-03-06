@@ -1,0 +1,114 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/00e6b9fa-5615-4afa-b3fc-a77554675c05')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/00e6b9fa-5615-4afa-b3fc-a77554675c05')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2022-11-01-preview",
+            "properties": {
+                "displayName": "InfoSec_Remote Access Software detected",
+                "description": "Detects a bunch of remote access / remote control software. ",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "DeviceProcessEvents\n| where TimeGenerated > ago(1h)\n| where FileName has_any (\n\"ScreenConnect.Client.exe\",\n\"ScreenConnect.Service.exe\",\n\"AgentMon.exe\",\n\"ccme_sm.exe\",\n\"GetASRSettings.exe\",\n\"kworking.exe\",\n\"klnagent.exe\",\n\"NinjaRMM.exe\",\n\"NinjaRMMAgent.exe\",\n\"AteraAgent.exe\",\n\"AteraRC.exe\",\n\"PulsewayService.exe\",\n\"Pulseway.TrayApp.exe\",\n\"Auvik.Engine.exe\",\n\"Auvik.Agent.exe\",\n\"Domotz.exe\",\n\"DomotzClient.exe\",\n\"LTClient.exe\",\n\"LTAService.exe\",\n\"VncClient.exe\",\n\"NAPClt.exe\",\n\"TakeControlRDViewer.exe\",\n\"ZA_Connect.exe\",\n\"LTSvcMon.exe\",\n\"putty.exe\",\n\"winvnc.exe\",\n\"LogMeIn.exe\"\n)\n| summarize arg_max(TimeGenerated, *) by FileName\n| project TimeGenerated, FileName, AccountName, AccountSid, DeviceName, InitiatingProcessAccountSid, InitiatingProcessAccountObjectId, InitiatingProcessCommandLine, InitiatingProcessAccountUpn\n",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT1H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "CommandAndControl"
+                ],
+                "techniques": [
+                    "T1219"
+                ],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": true,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT1H",
+                        "matchingMethod": "Selected",
+                        "groupByEntities": [
+                            "File"
+                        ],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": {
+                    "alertDisplayNameFormat": "InfoSec_Remote Access Software detected",
+                    "alertDescriptionFormat": "The user {{AccountName}} executed {{FileName}} for remote access from the host {{DeviceName}}\n\nC.Bartsch 09/23",
+                    "alertDynamicProperties": []
+                },
+                "customDetails": {},
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Sid",
+                                "columnName": "AccountSid"
+                            },
+                            {
+                                "identifier": "DisplayName",
+                                "columnName": "AccountName"
+                            },
+                            {
+                                "identifier": "AadUserId",
+                                "columnName": "InitiatingProcessAccountObjectId"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Process",
+                        "fieldMappings": [
+                            {
+                                "identifier": "CommandLine",
+                                "columnName": "InitiatingProcessCommandLine"
+                            },
+                            {
+                                "identifier": "CreationTimeUtc",
+                                "columnName": "TimeGenerated"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "File",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Name",
+                                "columnName": "FileName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "HostName",
+                                "columnName": "DeviceName"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        }
+    ]
+}
