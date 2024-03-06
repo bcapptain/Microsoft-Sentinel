@@ -347,8 +347,8 @@
 "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel-4')]"
 },
 "azuresentinel_1": {
-"id": "/subscriptions/02906dfb-eb9c-4ac7-b834-f63835e1ac76/providers/Microsoft.Web/locations/germanywestcentral/managedApis/azuresentinel",
-"connectionId": "/subscriptions/02906dfb-eb9c-4ac7-b834-f63835e1ac76/resourceGroups/CPG-LogAnalyticsGlobal/providers/Microsoft.Web/connections/azuresentinel-3",
+"id": "",
+"connectionId": "",
 "connectionName": "azuresentinel-3"
 },
 "azuresentinel-2": {

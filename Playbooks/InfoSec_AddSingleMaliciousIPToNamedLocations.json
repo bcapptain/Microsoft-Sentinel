@@ -187,7 +187,7 @@
                         "rawContent": "@{variables('WatchList_CSV')}",
                         "source": "Playbook InfoSec_AddSingleMaliciousIPToNamedLocations"
                     },
-                    "path": "/Watchlists/subscriptions/@{encodeURIComponent('02906dfb-eb9c-4ac7-b834-f63835e1ac76')}/resourceGroups/@{encodeURIComponent('CPG-LogAnalyticsGlobal')}/workspaces/@{encodeURIComponent('bca7af63-d75b-4b6b-9232-c74865c2f27e')}/watchlists/@{encodeURIComponent('NamedLocations_IP_Blacklist')}"
+                    "path": ""
                 }
             }
         },
@@ -394,8 +394,8 @@
     }
 },
 "azuresentinel": {
-    "id": "/subscriptions/02906dfb-eb9c-4ac7-b834-f63835e1ac76/providers/Microsoft.Web/locations/germanywestcentral/managedApis/azuresentinel",
-    "connectionId": "/subscriptions/02906dfb-eb9c-4ac7-b834-f63835e1ac76/resourceGroups/CPG-LogAnalyticsGlobal/providers/Microsoft.Web/connections/azuresentinel-3",
+    "id": "",
+    "connectionId": "",
     "connectionName": "azuresentinel-3"
 }
 }
