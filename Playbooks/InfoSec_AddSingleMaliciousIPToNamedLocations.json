@@ -1,0 +1,436 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "metadata": {
+        "title": "",
+        "description": "",
+        "prerequisites": "",
+    "postDeployment": [],
+    "prerequisitesDeployTemplateFile": "",
+    "lastUpdateTime": "",
+"entities": [],
+"tags": [],
+"support": {
+"tier": "community",
+"armtemplate": "Generated from https://github.com/Azure/Azure-Sentinel/tree/master/Tools/Playbook-ARM-Template-Generator"
+},
+"author": {
+"name": ""
+}
+},
+"parameters": {
+"PlaybookName": {
+"defaultValue": "InfoSec_AddSingleMaliciousIPToNamedLocations",
+"type": "string"
+}
+},
+"variables": {
+"MicrosoftSentinelConnectionName": "[concat('MicrosoftSentinel-', parameters('PlaybookName'))]"
+},
+"resources": [
+{
+"properties": {
+    "provisioningState": "Succeeded",
+    "state": "Enabled",
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "parameters": {
+            "$connections": {
+            "defaultValue": {},
+            "type": "Object"
+        }
+    },
+    "triggers": {
+        "Microsoft_Sentinel_entity": {
+            "type": "ApiConnectionWebhook",
+            "inputs": {
+                "host": {
+                    "connection": {
+                        "name": "@parameters('$connections')['azuresentinel_2']['connectionId']"
+                    }
+                },
+                "body": {
+                    "callback_url": "@{listCallbackUrl()}"
+                },
+                "path": "/entity/@{encodeURIComponent('IP')}"
+            }
+        }
+    },
+    "actions": {
+        "Create_CSV_for_WatchList": {
+            "runAfter": {
+                "Ipinfo_Response": [
+                    "Succeeded"
+                ]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "WatchList_CSV",
+                        "type": "string",
+                        "value": "TimeAdded,IPAddress,Hostname,City,Region,Country,Location,Org\n@{formatDateTime(utcNow(), 'yyyy-MM-ddTHH:mm:ss')},@{body('Ipinfo_Response')?['ip']},,@{body('Ipinfo_Response')?['city']},@{body('Ipinfo_Response')?['region']},@{body('Ipinfo_Response')?['country']},@{replace(body('Ipinfo_Response')?['loc'],',','/')},@{replace(body('Ipinfo_Response')?['org'],'\"','')}"
+                    }
+                ]
+            }
+        },
+        "Filter_array": {
+            "runAfter": {
+                "Parse_JSON": [
+                    "Succeeded"
+                ]
+            },
+            "type": "Query",
+            "inputs": {
+                "from": "@body('Parse_JSON')?['ipRanges']",
+                "where": "@equals(item()?['cidrAddress'], concat(variables('IPAddress'), '/32'))"
+            }
+        },
+        "Get-Named-Location": {
+            "runAfter": {
+                "Get-Named-Location-Id": [
+                    "Succeeded"
+                ]
+            },
+            "type": "Http",
+            "inputs": {
+                "uri": "https://graph.microsoft.com/beta/identity/conditionalAccess/namedLocations/@{body('Get-Named-Location-Id')['value'][0]['id']}",
+                "method": "GET",
+                "authentication": {
+                    "audience": "00000003-0000-0000-c000-000000000000",
+                    "type": "ManagedServiceIdentity"
+                }
+            }
+        },
+        "Get-Named-Location-Id": {
+            "runAfter": {
+                "Initialize_NewNamedLocation": [
+                    "Succeeded"
+                ]
+            },
+            "type": "Http",
+            "inputs": {
+                "uri": "https://graph.microsoft.com/v1.0/identity/conditionalAccess/namedLocations?$filter=displayName%20eq%20'@{variables('Name of NamedLocation')}'",
+                "method": "GET",
+                "authentication": {
+                    "audience": "00000003-0000-0000-c000-000000000000",
+                    "type": "ManagedServiceIdentity"
+                }
+            }
+        },
+        "Get_IPINFO": {
+        "runAfter": {},
+        "type": "Http",
+        "inputs": {
+            "uri": "https://ipinfo.io/@{triggerBody()?['Entity']?['properties']?['Address']}",
+            "method": "GET",
+            "headers": {
+                "Accept": "application/json",
+                "Content-type": "application/json"
+            }
+        }
+    },
+    "IP-is-New": {
+        "actions": {
+            "Append_to_array_variable": {
+                "type": "AppendToArrayVariable",
+                "inputs": {
+                    "name": "newIPs",
+                    "value": {
+                        "@@odata.type": "#microsoft.graph.iPv4CidrRange",
+                        "cidrAddress": "@{variables('IPAddress')}/32"
+                    }
+                }
+            },
+            "HTTP": {
+                "runAfter": {
+                    "Append_to_array_variable": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Http",
+                "inputs": {
+                    "uri": "https://graph.microsoft.com/beta/identity/conditionalAccess/namedLocations/@{body('Get-Named-Location-Id')['value'][0]['id']}",
+                    "method": "PATCH",
+                    "headers": {
+                        "Content-type": "application/json"
+                    },
+                    "body": {
+                        "@@odata.type": "#microsoft.graph.ipNamedLocation",
+                        "ipRanges": "@union(variables('newIPs'), body('Parse_JSON')?['ipRanges'])"
+                    },
+                    "authentication": {
+                        "audience": "00000003-0000-0000-c000-000000000000",
+                        "type": "ManagedServiceIdentity"
+                    }
+                }
+            },
+            "Watchlists_-_Create_a_new_Watchlist_with_data_(Raw_Content)": {
+                "runAfter": {
+                    "HTTP": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                        }
+                    },
+                    "method": "put",
+                    "body": {
+                        "description": "IPs added to NamedLocations Blacklist ",
+                        "displayName": "NamedLocations_IP_Blacklist",
+                        "itemsSearchKey": "IPAddress",
+                        "rawContent": "@{variables('WatchList_CSV')}",
+                        "source": "Playbook InfoSec_AddSingleMaliciousIPToNamedLocations"
+                    },
+                    "path": "/Watchlists/subscriptions/@{encodeURIComponent('02906dfb-eb9c-4ac7-b834-f63835e1ac76')}/resourceGroups/@{encodeURIComponent('CPG-LogAnalyticsGlobal')}/workspaces/@{encodeURIComponent('bca7af63-d75b-4b6b-9232-c74865c2f27e')}/watchlists/@{encodeURIComponent('NamedLocations_IP_Blacklist')}"
+                }
+            }
+        },
+        "runAfter": {
+            "Filter_array": [
+                "Succeeded"
+            ]
+        },
+        "else": {
+            "actions": {
+                "Terminate": {
+                    "type": "Terminate",
+                    "inputs": {
+                        "runStatus": "Failed",
+                        "runError": {
+                            "code": "1",
+                            "message": "The IP address is already listed"
+                        }
+                    }
+                }
+            }
+        },
+        "expression": {
+            "and": [
+                {
+                    "equals": [
+                        "@length(body('Filter_array'))",
+                        0
+                    ]
+                }
+            ]
+        },
+        "type": "If"
+    },
+    "Initialize_NewNamedLocation": {
+        "runAfter": {
+            "NewIPAddress": [
+                "Succeeded"
+            ]
+        },
+        "type": "InitializeVariable",
+        "inputs": {
+            "variables": [
+                {
+                    "name": "newIPs",
+                    "type": "array",
+                "value": []
+            }
+        ]
+    }
+},
+"Ipinfo_Response": {
+    "runAfter": {
+        "Get_IPINFO": [
+            "Succeeded"
+        ]
+    },
+    "type": "ParseJson",
+    "inputs": {
+        "content": "@body('Get_IPINFO')",
+        "schema": {
+            "properties": {
+                "anycast": {
+                    "type": "boolean"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "hostname": {
+                    "type": "string"
+                },
+                "ip": {
+                    "type": "string"
+                },
+                "loc": {
+                    "type": "string"
+                },
+                "org": {
+                    "type": "string"
+                },
+                "postal": {
+                    "type": "string"
+                },
+                "readme": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        }
+    }
+},
+"Name_of_NamedLocation": {
+    "runAfter": {
+        "Create_CSV_for_WatchList": [
+            "Succeeded"
+        ]
+    },
+    "type": "InitializeVariable",
+    "inputs": {
+        "variables": [
+            {
+                "name": "Name of NamedLocation",
+                "type": "string",
+                "value": "InfoSec_Malicious IPs"
+            }
+        ]
+    }
+},
+"NewIPAddress": {
+    "runAfter": {
+        "Name_of_NamedLocation": [
+            "Succeeded"
+        ]
+    },
+    "type": "InitializeVariable",
+    "inputs": {
+        "variables": [
+            {
+                "name": "IPAddress",
+                "type": "string",
+                "value": "@triggerBody()?['Entity']?['properties']?['Address']"
+            }
+        ]
+    }
+},
+"Parse_JSON": {
+    "runAfter": {
+        "Get-Named-Location": [
+            "Succeeded"
+        ]
+    },
+    "type": "ParseJson",
+    "inputs": {
+        "content": "@body('Get-Named-Location')",
+        "schema": {
+            "properties": {
+                "@@odata.context": {
+                    "type": "string"
+                },
+                "@@odata.type": {
+                    "type": "string"
+                },
+                "createdDateTime": {
+                    "type": "string"
+                },
+                "displayName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ipRanges": {
+                    "items": {
+                        "properties": {
+                            "@@odata.type": {
+                                "type": "string"
+                            },
+                            "cidrAddress": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "@@odata.type",
+                            "cidrAddress"
+                        ],
+                        "type": "object"
+                    },
+                    "type": "array"
+                },
+                "isTrusted": {
+                    "type": "boolean"
+                },
+                "modifiedDateTime": {
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        }
+    }
+}
+},
+"outputs": {}
+},
+"parameters": {
+"$connections": {
+"value": {
+"azuresentinel_2": {
+    "connectionId": "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]",
+    "connectionName": "[variables('MicrosoftSentinelConnectionName')]",
+    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]",
+    "connectionProperties": {
+        "authentication": {
+            "type": "ManagedServiceIdentity"
+        }
+    }
+},
+"azuresentinel": {
+    "id": "/subscriptions/02906dfb-eb9c-4ac7-b834-f63835e1ac76/providers/Microsoft.Web/locations/germanywestcentral/managedApis/azuresentinel",
+    "connectionId": "/subscriptions/02906dfb-eb9c-4ac7-b834-f63835e1ac76/resourceGroups/CPG-LogAnalyticsGlobal/providers/Microsoft.Web/connections/azuresentinel-3",
+    "connectionName": "azuresentinel-3"
+}
+}
+}
+}
+},
+"name": "[parameters('PlaybookName')]",
+"type": "Microsoft.Logic/workflows",
+"location": "[resourceGroup().location]",
+"identity": {
+"type": "SystemAssigned"
+},
+"tags": {
+"hidden-SentinelTemplateName": "InfoSec_AddSingleMaliciousIPToNamedLocations",
+"hidden-SentinelTemplateVersion": "1.0"
+},
+"apiVersion": "2017-07-01",
+"dependsOn": [
+"[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]"
+]
+},
+{
+"type": "Microsoft.Web/connections",
+"apiVersion": "2016-06-01",
+"name": "[variables('MicrosoftSentinelConnectionName')]",
+"location": "[resourceGroup().location]",
+"kind": "V1",
+"properties": {
+"displayName": "[variables('MicrosoftSentinelConnectionName')]",
+"customParameterValues": {},
+"parameterValueType": "Alternative",
+"api": {
+"id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]"
+}
+}
+}
+]
+}

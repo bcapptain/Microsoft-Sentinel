@@ -1,0 +1,814 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "metadata": {
+        "title": "",
+        "description": "",
+        "prerequisites": "",
+    "postDeployment": [],
+    "prerequisitesDeployTemplateFile": "",
+    "lastUpdateTime": "",
+"entities": [],
+"tags": [],
+"support": {
+"tier": "community",
+"armtemplate": "Generated from https://github.com/Azure/Azure-Sentinel/tree/master/Tools/Playbook-ARM-Template-Generator"
+},
+"author": {
+"name": ""
+}
+},
+"parameters": {
+"PlaybookName": {
+"defaultValue": "InfoSec_TeamsChatGPT",
+"type": "string"
+}
+},
+"variables": {
+"Teams-1ConnectionName": "[concat('Teams-1-', parameters('PlaybookName'))]",
+"ServicebusConnectionName": "[concat('Servicebus-', parameters('PlaybookName'))]"
+},
+"resources": [
+{
+"properties": {
+    "provisioningState": "Succeeded",
+    "state": "Enabled",
+    "integrationAccount": {
+        "name": "InfoSec_IntegrationAccount",
+        "id": "/subscriptions/02906dfb-eb9c-4ac7-b834-f63835e1ac76/resourceGroups/CPG-LogAnalyticsGlobal/providers/Microsoft.Logic/integrationAccounts/InfoSec_IntegrationAccount",
+        "type": "Microsoft.Logic/integrationAccounts"
+    },
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "parameters": {
+            "$connections": {
+            "defaultValue": {},
+            "type": "Object"
+        }
+    },
+    "staticResults": {
+        "Dead-letter_the_message_in_a_queue0": {
+            "status": "Succeeded",
+            "outputs": {
+                "statusCode": "OK",
+                "headers": {
+                    "header": "true"
+                },
+                "body": true
+            }
+        }
+    },
+    "triggers": {
+        "When_I'm_@mentioned": {
+            "type": "ApiConnectionWebhook",
+            "inputs": {
+                "host": {
+                    "connection": {
+                        "name": "@parameters('$connections')['teams-1']['connectionId']"
+                    }
+                },
+                "body": {
+                    "notificationUrl": "@{listCallbackUrl()}",
+                    "chats": [
+                        "19:6edafabdaddc4df78745516a23cdffe7@thread.v2"
+                    ]
+                },
+                "path": "/beta/subscriptions/atmentiontrigger/threadType/@{encodeURIComponent('groupchat')}"
+            }
+        }
+    },
+    "actions": {
+        "API_Key": {
+            "runAfter": {
+                "TriggerMessageContent": [
+                    "Succeeded"
+                ]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "APIKey",
+                        "type": "string",
+                        "value": "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"
+                    }
+                ]
+            }
+        },
+        "Initialize_TriggerMessageId": {
+            "runAfter": {
+                "For_each_3": [
+                    "Succeeded"
+                ]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "TriggerMessageId",
+                        "type": "string"
+                    }
+                ]
+            }
+        },
+        "For_each_2": {
+            "foreach": "@triggerBody()?['value']",
+            "actions": {
+                "Set_TriggerMessageId": {
+                    "type": "SetVariable",
+                    "inputs": {
+                        "name": "TriggerMessageId",
+                        "value": "@items('For_each_2')?['messageId']"
+                    }
+                }
+            },
+            "runAfter": {
+                "Initialize_TriggerMessageContent": [
+                    "Succeeded"
+                ]
+            },
+            "type": "Foreach"
+        },
+        "Initialize_TriggerMessageContent": {
+            "runAfter": {
+                "Initialize_TriggerMessageId": [
+                    "Succeeded"
+                ]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "TriggerMessageContent",
+                        "type": "string"
+                    }
+                ]
+            }
+        },
+        "Get_message_details": {
+            "runAfter": {
+                "For_each_2": [
+                    "Succeeded"
+                ]
+            },
+            "type": "ApiConnection",
+            "inputs": {
+                "host": {
+                    "connection": {
+                        "name": "@parameters('$connections')['teams-1']['connectionId']"
+                    }
+                },
+                "method": "post",
+                "body": {
+                    "recipient": "19:6edafabdaddc4df78745516a23cdffe7@thread.v2"
+                },
+                "path": "/beta/teams/messages/@{encodeURIComponent(variables('TriggerMessageId'))}/messageType/@{encodeURIComponent('groupchat')}"
+            }
+        },
+        "TriggerMessageContent": {
+            "runAfter": {
+                "Execute_JavaScript_Code": [
+                    "Succeeded"
+                ]
+            },
+            "type": "SetVariable",
+            "inputs": {
+                "name": "TriggerMessageContent",
+                "value": "@{body('Execute_JavaScript_Code')}"
+            }
+        },
+        "Execute_JavaScript_Code": {
+            "runAfter": {
+                "Get_message_details": [
+                    "Succeeded"
+                ]
+            },
+            "type": "JavaScriptCode",
+            "inputs": {
+                "code": "var text = workflowContext.actions.Get_message_details.outputs.body.body.plainTextContent;\r\nvar reg = /IU&nbsp;Cyber&nbsp;Security(&nbsp;|)(.*)/g;\r\nvar match = reg.exec(text);\r\nif (match) {\r\n    return match[2];  // This is the first match group\r\n}"
+            }
+        },
+        "ChatMessages": {
+            "runAfter": {
+                "API_Key": [
+                    "Succeeded"
+                ]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+                "variables": [
+                    {
+                        "name": "ChatMessages",
+                        "type": "array",
+                    "value": []
+                }
+            ]
+        }
+    },
+    "Get_messages_from_a_queue": {
+        "runAfter": {
+            "History_Empty_True": [
+                "Succeeded"
+            ]
+        },
+        "limit": {
+            "timeout": "PT3S"
+        },
+        "type": "ApiConnection",
+        "inputs": {
+            "host": {
+                "connection": {
+                    "name": "@parameters('$connections')['servicebus']['connectionId']"
+                }
+            },
+            "method": "get",
+            "path": "/@{encodeURIComponent(encodeURIComponent('teamschatgpt'))}/messages/batch/peek",
+            "queries": {
+                "queueType": "Main",
+                "maxMessageCount": 1
+            }
+        }
+    },
+    "IF_New_Chat": {
+        "actions": {
+            "Append_to_array_variable_1": {
+                "type": "AppendToArrayVariable",
+                "inputs": {
+                    "name": "ChatMessages",
+                    "value": {
+                        "content": "You are the assistant of the Cybersecurity Team ISS. It's members are Chris (Security Engineer), Christian (Security Analyst) and Kay (Junior Security Analyst), Olli (Pentester), Yasi (Project Manager), Lucas (Security Architect) and Marc, our Team Lead. Be a little rude in this conversation but still nice. If it starts in German, please answer in German.",
+                        "role": "system"
+                    }
+                }
+            },
+            "HTTP": {
+                "runAfter": {
+                    "Append_to_array_variable_1_copy_1": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Http",
+                "inputs": {
+                    "uri": "https://api.openai.com/v1/chat/completions",
+                    "method": "POST",
+                    "headers": {
+                        "Authorization": "Bearer @{variables('APIKey')}",
+                        "Content-Type": "application/json",
+                        "OpenAI-Organization": "org-8hN792CgG6jB4SRKVYyjNajY"
+                    },
+                    "body": {
+                        "messages": "@variables('ChatMessages')",
+                        "model": "gpt-4",
+                        "temperature": 0.8
+                    }
+                }
+            },
+            "Parse_JSON": {
+                "runAfter": {
+                    "HTTP": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "ParseJson",
+                "inputs": {
+                    "content": "@body('HTTP')",
+                    "schema": {
+                        "properties": {
+                            "choices": {
+                                "items": {
+                                    "properties": {
+                                        "finish_reason": {
+                                            "type": "string"
+                                        },
+                                        "index": {
+                                            "type": "integer"
+                                        },
+                                        "message": {
+                                            "properties": {
+                                                "content": {
+                                                    "type": "string"
+                                                },
+                                                "role": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "required": [
+                                        "message",
+                                        "finish_reason",
+                                        "index"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            },
+                            "created": {
+                                "type": "integer"
+                            },
+                            "id": {
+                                "type": "string"
+                            },
+                            "model": {
+                                "type": "string"
+                            },
+                            "object": {
+                                "type": "string"
+                            },
+                            "usage": {
+                                "properties": {
+                                    "completion_tokens": {
+                                        "type": "integer"
+                                    },
+                                    "prompt_tokens": {
+                                        "type": "integer"
+                                    },
+                                    "total_tokens": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "type": "object"
+                    }
+                }
+            },
+            "For_each_1": {
+                "foreach": "@outputs('Parse_JSON')?['body']?['choices']",
+                "actions": {
+                    "Append_to_array_variable": {
+                        "type": "AppendToArrayVariable",
+                        "inputs": {
+                            "name": "ChatMessages",
+                            "value": "@items('For_each_1')?['message']"
+                        }
+                    },
+                    "Post_message_in_a_chat_or_channel_1": {
+                        "runAfter": {
+                            "Append_to_array_variable": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['teams-1']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": {
+                                "recipient": "19:6edafabdaddc4df78745516a23cdffe7@thread.v2",
+                                "messageBody": "<p>@{items('For_each_1')?['message']?['content']}</p>"
+                            },
+                            "path": "/beta/teams/conversation/message/poster/@{encodeURIComponent('User')}/location/@{encodeURIComponent('Group chat')}"
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Parse_JSON": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Foreach"
+            },
+            "Append_to_array_variable_1_copy_1": {
+                "runAfter": {
+                    "Append_to_array_variable_1": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "AppendToArrayVariable",
+                "inputs": {
+                    "name": "ChatMessages",
+                    "value": {
+                        "content": "@{variables('TriggerMessageContent')}",
+                        "role": "user"
+                    }
+                }
+            }
+        },
+        "runAfter": {
+            "ChatMessages": [
+                "Succeeded"
+            ]
+        },
+        "else": {
+            "actions": {
+                "Parse_JSON_copy": {
+                    "runAfter": {
+                        "HTTP_copy": [
+                            "Succeeded"
+                        ]
+                    },
+                    "type": "ParseJson",
+                    "inputs": {
+                        "content": "@body('HTTP_copy')",
+                        "schema": {
+                            "properties": {
+                                "choices": {
+                                    "items": {
+                                        "properties": {
+                                            "finish_reason": {
+                                                "type": "string"
+                                            },
+                                            "index": {
+                                                "type": "integer"
+                                            },
+                                            "message": {
+                                                "properties": {
+                                                    "content": {
+                                                        "type": "string"
+                                                    },
+                                                    "role": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "required": [
+                                            "message",
+                                            "finish_reason",
+                                            "index"
+                                        ],
+                                        "type": "object"
+                                    },
+                                    "type": "array"
+                                },
+                                "created": {
+                                    "type": "integer"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "model": {
+                                    "type": "string"
+                                },
+                                "object": {
+                                    "type": "string"
+                                },
+                                "usage": {
+                                    "properties": {
+                                        "completion_tokens": {
+                                            "type": "integer"
+                                        },
+                                        "prompt_tokens": {
+                                            "type": "integer"
+                                        },
+                                        "total_tokens": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "Append_to_array_variable_1_copy": {
+                    "type": "AppendToArrayVariable",
+                    "inputs": {
+                        "name": "chathistory_array",
+                        "value": {
+                            "content": "@{variables('TriggerMessageContent')}",
+                            "role": "user"
+                        }
+                    }
+                },
+                "For_each": {
+                    "foreach": "@outputs('Parse_JSON_copy')?['body']?['choices']",
+                    "actions": {
+                        "Append_to_array_variable_copy": {
+                            "type": "AppendToArrayVariable",
+                            "inputs": {
+                                "name": "chathistory_array",
+                                "value": "@items('For_each')?['message']"
+                            }
+                        },
+                        "Post_message_in_a_chat_or_channel_1_copy": {
+                            "runAfter": {
+                                "Append_to_array_variable_copy": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['teams-1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "body": {
+                                    "recipient": "19:6edafabdaddc4df78745516a23cdffe7@thread.v2",
+                                    "messageBody": "<p>@{items('For_each')?['message']?['content']}</p>"
+                                },
+                                "path": "/beta/teams/conversation/message/poster/@{encodeURIComponent('User')}/location/@{encodeURIComponent('Group chat')}"
+                            }
+                        },
+                        "Set_variable_1": {
+                            "runAfter": {
+                                "Post_message_in_a_chat_or_channel_1_copy": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "SetVariable",
+                            "inputs": {
+                                "name": "ChatMessages",
+                                "value": "@variables('chathistory_array')"
+                            }
+                        }
+                    },
+                    "runAfter": {
+                        "Parse_JSON_copy": [
+                            "Succeeded"
+                        ]
+                    },
+                    "type": "Foreach"
+                },
+                "HTTP_copy": {
+                    "runAfter": {
+                        "Append_to_array_variable_1_copy": [
+                            "Succeeded"
+                        ]
+                    },
+                    "type": "Http",
+                    "inputs": {
+                        "uri": "https://api.openai.com/v1/chat/completions",
+                        "method": "POST",
+                        "headers": {
+                            "Authorization": "Bearer @{variables('APIKey')}",
+                            "Content-Type": "application/json",
+                            "OpenAI-Organization": "org-8hN792CgG6jB4SRKVYyjNajY"
+                        },
+                        "body": {
+                            "messages": "@variables('chathistory_array')",
+                            "model": "gpt-4",
+                            "temperature": 0.8
+                        }
+                    }
+                }
+            }
+        },
+        "expression": {
+            "and": [
+                {
+                    "equals": [
+                        "@variables('historyisempty')",
+                        true
+                    ]
+                }
+            ]
+        },
+        "type": "If"
+    },
+    "Send_message": {
+        "runAfter": {
+            "IF_New_Chat": [
+                "Succeeded"
+            ]
+        },
+        "type": "ApiConnection",
+        "inputs": {
+            "host": {
+                "connection": {
+                    "name": "@parameters('$connections')['servicebus']['connectionId']"
+                }
+            },
+            "method": "post",
+            "body": {
+                "SessionId": "@body('Parse_JSON_copy')?['id']",
+                "ContentData": "@{base64(variables('ChatMessages'))}",
+                "ContentType": "application/json"
+            },
+            "path": "/@{encodeURIComponent(encodeURIComponent('teamschatgpt'))}/messages"
+        }
+    },
+    "For_each_3": {
+        "foreach": "@body('Get_messages_from_a_queue')",
+        "actions": {
+            "Dead-letter_the_message_in_a_queue": {
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['servicebus']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "path": "/@{encodeURIComponent(encodeURIComponent('teamschatgpt'))}/messages/deadletter",
+                    "queries": {
+                        "lockToken": "@items('For_each_3')?['LockToken']",
+                        "sessionId": "",
+                        "deadLetterReason": "read once"
+                    }
+                },
+                "runtimeConfiguration": {
+                    "staticResult": {
+                        "staticResultOptions": "Disabled",
+                        "name": "Dead-letter_the_message_in_a_queue0"
+                    }
+                }
+            }
+        },
+        "runAfter": {
+            "For_each_5": [
+                "Succeeded"
+            ]
+        },
+        "type": "Foreach"
+    },
+    "History_Empty_True": {
+    "runAfter": {},
+    "type": "InitializeVariable",
+    "inputs": {
+        "variables": [
+            {
+                "name": "historyisempty",
+                "type": "boolean",
+                "value": true
+            }
+        ]
+    }
+},
+"For_each_5": {
+    "foreach": "@body('Get_messages_from_a_queue')",
+    "actions": {
+        "MessageFromQueue": {
+            "type": "ParseJson",
+            "inputs": {
+                "content": "@base64ToString(item()?['ContentData'])",
+                "schema": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "content": {
+                                "type": "string"
+                            },
+                            "role": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "content",
+                            "role"
+                        ]
+                    }
+                }
+            }
+        },
+        "historyisempty_false": {
+            "runAfter": {
+                "Set_variable": [
+                    "Succeeded"
+                ]
+            },
+            "type": "SetVariable",
+            "inputs": {
+                "name": "historyisempty",
+                "value": false
+            }
+        },
+        "Set_variable": {
+            "runAfter": {
+                "MessageFromQueue": [
+                    "Succeeded"
+                ]
+            },
+            "type": "SetVariable",
+            "inputs": {
+                "name": "chathistory_array",
+                "value": "@body('MessageFromQueue')"
+            }
+        }
+    },
+    "runAfter": {
+        "Initialize_variable": [
+            "Succeeded"
+        ]
+    },
+    "type": "Foreach"
+},
+"Initialize_variable": {
+    "runAfter": {
+        "For_each_6": [
+            "Succeeded"
+        ]
+    },
+    "type": "InitializeVariable",
+    "inputs": {
+        "variables": [
+            {
+                "name": "chathistory_array",
+                "type": "array"
+            }
+        ]
+    }
+},
+"session_id": {
+    "runAfter": {
+        "Get_messages_from_a_queue": [
+            "Succeeded"
+        ]
+    },
+    "type": "InitializeVariable",
+    "inputs": {
+        "variables": [
+            {
+                "name": "session_id",
+                "type": "string"
+            }
+        ]
+    }
+},
+"For_each_6": {
+    "foreach": "@body('Get_messages_from_a_queue')",
+    "actions": {
+        "Set_session_id": {
+            "type": "SetVariable",
+            "inputs": {
+                "name": "session_id",
+                "value": "@item()?['SessionId']"
+            }
+        }
+    },
+    "runAfter": {
+        "session_id": [
+            "Succeeded"
+        ]
+    },
+    "type": "Foreach"
+}
+},
+"outputs": {}
+},
+"parameters": {
+"$connections": {
+"value": {
+"teams-1": {
+    "connectionId": "[resourceId('Microsoft.Web/connections', variables('Teams-1ConnectionName'))]",
+    "connectionName": "[variables('Teams-1ConnectionName')]",
+    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Teams-1')]"
+},
+"servicebus": {
+    "connectionId": "[resourceId('Microsoft.Web/connections', variables('ServicebusConnectionName'))]",
+    "connectionName": "[variables('ServicebusConnectionName')]",
+    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Servicebus')]"
+}
+}
+}
+},
+"accessControl": {}
+},
+"name": "[parameters('PlaybookName')]",
+"type": "Microsoft.Logic/workflows",
+"location": "[resourceGroup().location]",
+"identity": {
+"type": "SystemAssigned"
+},
+"tags": {
+"hidden-SentinelTemplateName": "InfoSec_TeamsChatGPT",
+"hidden-SentinelTemplateVersion": "1.0"
+},
+"apiVersion": "2017-07-01",
+"dependsOn": [
+"[resourceId('Microsoft.Web/connections', variables('Teams-1ConnectionName'))]",
+"[resourceId('Microsoft.Web/connections', variables('ServicebusConnectionName'))]"
+]
+},
+{
+"type": "Microsoft.Web/connections",
+"apiVersion": "2016-06-01",
+"name": "[variables('Teams-1ConnectionName')]",
+"location": "[resourceGroup().location]",
+"kind": "V1",
+"properties": {
+"displayName": "[variables('Teams-1ConnectionName')]",
+"customParameterValues": {},
+"api": {
+"id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Teams-1')]"
+}
+}
+},
+{
+"type": "Microsoft.Web/connections",
+"apiVersion": "2016-06-01",
+"name": "[variables('ServicebusConnectionName')]",
+"location": "[resourceGroup().location]",
+"kind": "V1",
+"properties": {
+"displayName": "[variables('ServicebusConnectionName')]",
+"customParameterValues": {},
+"api": {
+"id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Servicebus')]"
+}
+}
+}
+]
+}

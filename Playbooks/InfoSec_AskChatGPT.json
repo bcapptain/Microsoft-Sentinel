@@ -1,0 +1,258 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "metadata": {
+        "title": "",
+        "description": "",
+        "prerequisites": "",
+    "postDeployment": [],
+    "prerequisitesDeployTemplateFile": "",
+    "lastUpdateTime": "",
+"entities": [],
+"tags": [],
+"support": {
+"tier": "community",
+"armtemplate": "Generated from https://github.com/Azure/Azure-Sentinel/tree/master/Tools/Playbook-ARM-Template-Generator"
+},
+"author": {
+"name": ""
+}
+},
+"parameters": {
+"PlaybookName": {
+"defaultValue": "InfoSec_AskChatGPT",
+"type": "string"
+}
+},
+"variables": {
+"MicrosoftSentinelConnectionName": "[concat('MicrosoftSentinel-', parameters('PlaybookName'))]"
+},
+"resources": [
+{
+"properties": {
+    "provisioningState": "Succeeded",
+    "state": "Enabled",
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "parameters": {
+            "$connections": {
+            "defaultValue": {},
+            "type": "Object"
+        }
+    },
+    "triggers": {
+        "Microsoft_Sentinel_incident": {
+            "type": "ApiConnectionWebhook",
+            "inputs": {
+                "body": {
+                    "callback_url": "@{listCallbackUrl()}"
+                },
+                "host": {
+                    "connection": {
+                        "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                    }
+                },
+                "path": "/incident-creation"
+            },
+        "conditions": []
+    }
+},
+"actions": {
+    "For_each": {
+        "foreach": "@body('Parse_JSON')?['choices']",
+        "actions": {
+            "Add_comment_to_incident_(V3)": {
+            "runAfter": {},
+            "type": "ApiConnection",
+            "inputs": {
+                "body": {
+                    "incidentArmId": "@triggerBody()?['object']?['id']",
+                    "message": "<p>ChatGPT assistance:<br>\n@{items('For_each')?['message']?['content']}<br>\n<br>\n</p>"
+                },
+                "host": {
+                    "connection": {
+                        "name": "@parameters('$connections')['azuresentinel_4']['connectionId']"
+                    }
+                },
+                "method": "post",
+                "path": "/Incidents/Comment"
+            }
+        }
+    },
+    "runAfter": {
+        "Parse_JSON": [
+            "Succeeded"
+        ]
+    },
+    "type": "Foreach"
+},
+"HTTP": {
+    "runAfter": {
+        "Initialize_variable": [
+            "Succeeded"
+        ]
+    },
+    "type": "Http",
+    "inputs": {
+        "body": {
+            "messages": [
+                {
+                    "content": "What does this security alert from Microsoft Sentinel actually mean and how to proper react on this alert? Alert Name: @{triggerBody()?['object']?['properties']?['title']}",
+                    "role": "user"
+                }
+            ],
+            "model": "gpt-3.5-turbo",
+            "temperature": 0.7
+        },
+        "headers": {
+            "Authorization": "Bearer @{variables('APIKey')}",
+            "Content-Type": "application/json",
+            "OpenAI-Organization": "org-8hN792CgG6jB4SRKVYyjNajY"
+        },
+        "method": "POST",
+        "uri": "https://api.openai.com/v1/chat/completions"
+    }
+},
+"Initialize_variable": {
+"runAfter": {},
+"type": "InitializeVariable",
+"inputs": {
+    "variables": [
+        {
+            "name": "APIKey",
+            "type": "string",
+            "value": "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"
+        }
+    ]
+}
+},
+"Parse_JSON": {
+"runAfter": {
+    "HTTP": [
+        "Succeeded"
+    ]
+},
+"type": "ParseJson",
+"inputs": {
+    "content": "@body('HTTP')",
+    "schema": {
+        "properties": {
+            "choices": {
+                "items": {
+                    "properties": {
+                        "finish_reason": {
+                            "type": "string"
+                        },
+                        "index": {
+                            "type": "integer"
+                        },
+                        "message": {
+                            "properties": {
+                                "content": {
+                                    "type": "string"
+                                },
+                                "role": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "required": [
+                        "message",
+                        "finish_reason",
+                        "index"
+                    ],
+                    "type": "object"
+                },
+                "type": "array"
+            },
+            "created": {
+                "type": "integer"
+            },
+            "id": {
+                "type": "string"
+            },
+            "model": {
+                "type": "string"
+            },
+            "object": {
+                "type": "string"
+            },
+            "usage": {
+                "properties": {
+                    "completion_tokens": {
+                        "type": "integer"
+                    },
+                    "prompt_tokens": {
+                        "type": "integer"
+                    },
+                    "total_tokens": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "type": "object"
+    }
+}
+}
+},
+"outputs": {}
+},
+"parameters": {
+"$connections": {
+"value": {
+"azuresentinel": {
+"connectionId": "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]",
+"connectionName": "[variables('MicrosoftSentinelConnectionName')]",
+"id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]",
+"connectionProperties": {
+    "authentication": {
+        "type": "ManagedServiceIdentity"
+    }
+}
+},
+"azuresentinel_4": {
+"connectionId": "/subscriptions/02906dfb-eb9c-4ac7-b834-f63835e1ac76/resourceGroups/CPG-LogAnalyticsGlobal/providers/Microsoft.Web/connections/azuresentinel-3",
+"connectionName": "azuresentinel-3",
+"id": "/subscriptions/02906dfb-eb9c-4ac7-b834-f63835e1ac76/providers/Microsoft.Web/locations/germanywestcentral/managedApis/azuresentinel"
+}
+}
+}
+}
+},
+"name": "[parameters('PlaybookName')]",
+"type": "Microsoft.Logic/workflows",
+"location": "[resourceGroup().location]",
+"identity": {
+"type": "SystemAssigned"
+},
+"tags": {
+"hidden-SentinelTemplateName": "InfoSec_AskChatGPT",
+"hidden-SentinelTemplateVersion": "1.0"
+},
+"apiVersion": "2017-07-01",
+"dependsOn": [
+"[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]"
+]
+},
+{
+"type": "Microsoft.Web/connections",
+"apiVersion": "2016-06-01",
+"name": "[variables('MicrosoftSentinelConnectionName')]",
+"location": "[resourceGroup().location]",
+"kind": "V1",
+"properties": {
+"displayName": "[variables('MicrosoftSentinelConnectionName')]",
+"customParameterValues": {},
+"parameterValueType": "Alternative",
+"api": {
+"id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]"
+}
+}
+}
+]
+}
