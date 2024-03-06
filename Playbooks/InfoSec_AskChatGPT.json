@@ -108,7 +108,7 @@
         "headers": {
             "Authorization": "Bearer @{variables('APIKey')}",
             "Content-Type": "application/json",
-            "OpenAI-Organization": "org-8hN792CgG6jB4SRKVYyjNajY"
+            "OpenAI-Organization": ""
         },
         "method": "POST",
         "uri": "https://api.openai.com/v1/chat/completions"
@@ -122,7 +122,7 @@
         {
             "name": "APIKey",
             "type": "string",
-            "value": "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"
+            "value": ""
         }
     ]
 }

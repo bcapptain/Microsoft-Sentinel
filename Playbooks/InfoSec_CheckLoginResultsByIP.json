@@ -275,10 +275,10 @@
                 "body": "let IP = \"@{items('For_each')?['Address']}\";\nSigninLogs\n| where IPAddress == IP\n| where ResultType == 0\n| summarize count() by Identity, UserId, IP",
                 "path": "/queryData",
                 "queries": {
-                    "subscriptions": "02906dfb-eb9c-4ac7-b834-f63835e1ac76",
-                    "resourcegroups": "CPG-LogAnalyticsGlobal",
-                    "resourcetype": "Log Analytics Workspace",
-                    "resourcename": "cpg-loganalytics-workspace",
+                    "subscriptions": "",
+                    "resourcegroups": "",
+                    "resourcetype": "",
+                    "resourcename": "",
                     "timerange": "Last 48 hours"
                 }
             }
