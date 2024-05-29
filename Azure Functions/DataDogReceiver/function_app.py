@@ -49,7 +49,7 @@ def datadogforwarder(req: func.HttpRequest) -> func.HttpResponse:
     except KeyError:
         logging.error("Environment variable 'LOG_ANALYTICS_PRIMARY_KEY' not found.")
         shared_key = None
-    log_type = 'DataDog'
+    log_type = 'NGINX'
     timestamp = datetime.datetime.now().isoformat()
     timestamp = datetime.datetime.now(datetime.UTC).strftime("%a, %d %b %Y %H:%M:%S GMT")
     json_data = data
