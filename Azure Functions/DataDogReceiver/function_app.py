@@ -32,6 +32,17 @@ def datadogforwarder(req: func.HttpRequest) -> func.HttpResponse:
         )
     #logging.info(req_body)
 
+   # Remove "attributes" Object, since it blows up the LA table over time
+    if isinstance(req_body, list):
+        for item in req_body:
+            if "attributes" in item:
+                del item["attributes"]  # Remove the "attributes" object
+                #logging.info("Removed the attributes object!")
+    elif isinstance(req_body, dict):
+        if "attributes" in req_body:
+            del req_body["attributes"]  # Remove the "attributes" object
+            #logging.info("Removed the attributes object!")
+    
     # Convert the request body to JSON string
     data = json.dumps(req_body)
     
