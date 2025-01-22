@@ -20,7 +20,7 @@
 },
 "parameters": {
 "PlaybookName": {
-"defaultValue": "InfoSec_AddSingleMaliciousIPToNamedLocations",
+"defaultValue": "AddSingleMaliciousIPToNamedLocations",
 "type": "string"
 }
 },
@@ -185,7 +185,7 @@
                         "displayName": "NamedLocations_IP_Blacklist",
                         "itemsSearchKey": "IPAddress",
                         "rawContent": "@{variables('WatchList_CSV')}",
-                        "source": "Playbook InfoSec_AddSingleMaliciousIPToNamedLocations"
+                        "source": "Playbook AddSingleMaliciousIPToNamedLocations"
                     },
                     "path": ""
                 }
@@ -409,7 +409,7 @@
 "type": "SystemAssigned"
 },
 "tags": {
-"hidden-SentinelTemplateName": "InfoSec_AddSingleMaliciousIPToNamedLocations",
+"hidden-SentinelTemplateName": "AddSingleMaliciousIPToNamedLocations",
 "hidden-SentinelTemplateVersion": "1.0"
 },
 "apiVersion": "2017-07-01",
