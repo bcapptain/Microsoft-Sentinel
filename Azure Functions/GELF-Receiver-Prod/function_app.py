@@ -11,6 +11,12 @@ import hmac
 
 app = func.FunctionApp()
 
+def clean_field_name(key: str) -> str:
+    """Remove '_' prefix from any field name."""
+    if key.startswith('_'):
+        return key[1:]
+    return key
+
 def build_signature(workspace_id, workspace_key, date, content_length, method, content_type, resource):
     """Build the signature for Log Analytics authentication."""
     x_headers = 'x-ms-date:' + date
@@ -22,7 +28,7 @@ def build_signature(workspace_id, workspace_key, date, content_length, method, c
     ).decode('utf-8')
     return f"SharedKey {workspace_id}:{encoded_hash}"
 
-@app.route(route="GELF-Receiver-prod", auth_level=func.AuthLevel.FUNCTION)
+@app.route(route="GELFReceiver", auth_level=func.AuthLevel.FUNCTION)
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
 
@@ -39,7 +45,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # Get Log Analytics workspace details
         workspace_id = os.environ["LogAnalyticsWorkspaceId"]
         workspace_key = os.environ["LogAnalyticsWorkspaceKey"]
-        table_name = os.environ.get("LogAnalyticsTableName",)
+        table_name = os.environ.get("LogAnalyticsTableName", "GELF_TEST_CL")
 
         # Process GELF data
         if isinstance(req_body, list):
@@ -50,25 +56,28 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # Prepare data for Log Analytics
         records = []
         for entry in gelf_entries:
-            if '_gl2_receive_timestamp' in entry:
+            # Clean field names
+            cleaned_entry = {clean_field_name(k): v for k, v in entry.items()}
+            
+            if 'gl2_receive_timestamp' in cleaned_entry:
                 try:
                     # Try to parse the string timestamp first
-                    timestamp = datetime.datetime.strptime(entry['_gl2_receive_timestamp'], '%Y-%m-%d %H:%M:%S.%f')
+                    timestamp = datetime.datetime.strptime(cleaned_entry['gl2_receive_timestamp'], '%Y-%m-%d %H:%M:%S.%f')
                 except (ValueError, TypeError):
                     try:
                         # Fall back to original timestamp if available
-                        timestamp = datetime.datetime.fromtimestamp(float(entry['timestamp']), UTC)
+                        timestamp = datetime.datetime.fromtimestamp(float(cleaned_entry['timestamp']), UTC)
                     except (ValueError, TypeError, KeyError):
                         timestamp = datetime.datetime.now(UTC)
-                entry['TimeGenerated'] = timestamp.isoformat()
+                cleaned_entry['TimeGenerated'] = timestamp.isoformat()
             else:
-                entry['TimeGenerated'] = datetime.datetime.now(UTC).isoformat()
+                cleaned_entry['TimeGenerated'] = datetime.datetime.now(UTC).isoformat()
 
-            for key, value in entry.items():
+            for key, value in cleaned_entry.items():
                 if not isinstance(value, (str, int, float, bool)):
-                    entry[key] = str(value)
+                    cleaned_entry[key] = str(value)
 
-            records.append(entry)
+            records.append(cleaned_entry)
 
         # Prepare request for Log Analytics
         body = json.dumps(records)
